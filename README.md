@@ -76,6 +76,30 @@ The JAR will be located at: `target/ChartGeneratorLambdaFunction-1.0-SNAPSHOT.ja
 ## Supporting Scripts (Raspberry Pi)
 The `raspberry-pi/` directory contains Python scripts designed to run on a Raspberry Pi (or similar device) to feed data into the system.
 
+### IAM Permissions (for Python Scripts)
+To allow the scripts to communicate with AWS, the IAM user or role running them must have the following policy. This grants the specific permissions required for both real-time and historical data ingestion:
+
+- **`dynamodb:PutItem`**: Required for `upload.py` to insert individual water level readings every minute.
+- **`dynamodb:UpdateItem`**: Allows for granular updates to existing data points if necessary.
+- **`dynamodb:BatchWriteItem`**: Required for `batch_upload.py` to efficiently upload multiple historical records in a single request.
+
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "dynamodb:PutItem",
+                "dynamodb:UpdateItem",
+                "dynamodb:BatchWriteItem"
+            ],
+            "Resource": "arn:aws:dynamodb:<REGION>:<YOUR_ACCOUNT_ID>:table/<TABLE_NAME>"
+        }
+    ]
+}
+```
+
 ### `upload.py`
 Used for real-time data uploads. It accepts three parameters: `Date`, `Time`, and `Level`.
 **Recommended Cron Job (every minute):**
