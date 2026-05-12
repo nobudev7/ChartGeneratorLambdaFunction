@@ -72,3 +72,20 @@ To generate the "fat JAR" for deployment to the AWS Lambda Console:
 mvn clean package
 ```
 The JAR will be located at: `target/ChartGeneratorLambdaFunction-1.0-SNAPSHOT.jar`.
+
+## Supporting Scripts (Raspberry Pi)
+The `raspberry-pi/` directory contains Python scripts designed to run on a Raspberry Pi (or similar device) to feed data into the system.
+
+### `upload.py`
+Used for real-time data uploads. It accepts three parameters: `Date`, `Time`, and `Level`.
+**Recommended Cron Job (every minute):**
+```cronexp
+* * * * * /usr/bin/python3 /path/to/raspberry-pi/upload.py $(date +\%Y\%m\%d) $(date +\%H:\%M:\%S) $(/path/to/get_water_level.sh)
+```
+
+### `batch_upload.py`
+Used for uploading a full day's worth of data from a CSV file. It extracts the date from the filename (e.g., `waterlevel-20260510.csv`), parses the data, and batch writes 20 points at a time with a 1-second delay between batches to respect rate limits.
+**Recommended Cron Job (daily after midnight):**
+```cronexp
+5 0 * * * /usr/bin/python3 /path/to/raspberry-pi/batch_upload.py /path/to/data/waterlevel-$(date -d "yesterday" +\%Y\%m\%d).csv
+```
