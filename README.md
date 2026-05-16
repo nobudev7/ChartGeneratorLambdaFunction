@@ -10,7 +10,8 @@ This project migrates the original [SumpDataVisualizer CLI tool](https://github.
 4.  Updates a central `file-list.json` on S3 to ensure the frontend website can discover new images immediately.
 
 ## How it Works
--   **Trigger:** Designed to be triggered by a new data point write to DynamoDB table.
+-   **Trigger:** Can be triggered manually, on a schedule (Amazon EventBridge), or via other AWS services.
+-   **Date Selection:** By default, it generates a chart for the current day. It can also be configured to generate a chart for "yesterday" or any specific date (see [Input Parameters](#input-parameters)).
 -   **Data Retrieval:** Queries the `Sump_Water_Level` DynamoDB table using a partition key (`Date` in `YYYYMMDD`) and sort key (`Time` in `HH:MM:SS`).
 -   **Chart Generation:** Uses `JFreeChart` to create a 1600x900 PNG image. The image is processed entirely in memory (as a `byte[]`) to avoid Lambda filesystem limitations.
 -   **Storage & Organization:**
@@ -18,16 +19,59 @@ This project migrates the original [SumpDataVisualizer CLI tool](https://github.
     -   Metadata is stored at: `output/file-list.json`
 -   **Cache Management:** To ensure CloudFront serves fresh content without manual invalidations, the function sets a `Cache-Control: max-age=60` header on all S3 uploads.
 
+## Input Parameters
+The Lambda function accepts a JSON payload to control which date the chart is generated for:
+
+| Parameter | Type | Value Example | Description |
+| :--- | :--- | :--- | :--- |
+| `target` | String | `"yesterday"` | Generates a chart for the previous day. |
+| `date` | String | `"2026-05-10"` | Generates a chart for the specified `YYYY-MM-DD` date. |
+
+**Example (Yesterday):**
+```json
+{ "target": "yesterday" }
+```
+
+**Example (Specific Date):**
+```json
+{ "date": "2026-05-15" }
+```
+
+If no parameters are provided, it defaults to the current day.
+
+## AWS Lambda Setup & Scheduling
+
+### Deployment
+1.  **Build the JAR:** Run `mvn clean package`.
+2.  **Create Lambda:** In the AWS Console, create a new Java 21 Lambda function.
+3.  **Upload JAR:** Upload the `target/ChartGeneratorLambdaFunction-1.0-SNAPSHOT.jar`.
+4.  **Handler Configuration:** Set the handler to `com.nobudev7.ChartGeneratorHandler::handleRequest`.
+5.  **Runtime Settings:** Optional - Set 512MB of memory (JFreeChart can be memory intensive).
+6.  **IAM Role:** Assign a role with the permissions described in the [IAM Permissions](#iam-permissions) section.
+
+### Scheduling Yesterday's Report
+To generate a chart for "yesterday" shortly after midnight every day:
+1.  Open **Amazon EventBridge** -> **Schedules**.
+2.  Click **Create schedule**.
+3.  **Schedule pattern:** `cron(5 0 * * ? *)` (Runs every day at 00:05 UTC).
+4.  **Target:** Select your **Lambda function**.
+5.  **Payload (Constant JSON):**
+    ```json
+    { "target": "yesterday" }
+    ```
+6.  Finish the wizard to activate the schedule.
+
 ## Local Testing
-The project includes a JUnit test (`LocalTest.java`) that allows you to run the full Lambda logic from your local machine (IntelliJ or Maven).
+The project includes a JUnit test (`LocalTest.java`) that allows you to run the full Lambda logic from your local machine.
 
 ### What the Unit Test Does:
 1.  Instantiates the `ChartGeneratorHandler`.
-2.  Mocks the AWS Lambda `Context` (for logging) and `ScheduledEvent`.
-3.  Invokes the handler logic, which will:
-    -   Connect to your **real** AWS DynamoDB table.
-    -   Generate a **real** chart image.
-    -   Upload both the image and the updated JSON to your **real** S3 bucket.
+2.  Mocks the AWS Lambda `Context` (for logging).
+3.  Invokes the handler with different scenarios:
+    -   **Default:** Generates today's chart.
+    -   **Yesterday:** Generates yesterday's chart.
+    -   **Specific Date:** Generates a chart for a provided date.
+4.  The tests connect to your **real** AWS resources.
 
 ## Requirements
 ### Software

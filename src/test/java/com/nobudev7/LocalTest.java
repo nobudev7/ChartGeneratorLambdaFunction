@@ -1,7 +1,8 @@
 package com.nobudev7;
 
-import com.amazonaws.services.lambda.runtime.events.ScheduledEvent;
 import org.junit.jupiter.api.Test;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Local test to run the Lambda Handler.
@@ -11,19 +12,31 @@ import org.junit.jupiter.api.Test;
 public class LocalTest {
 
     @Test
-    public void testLambdaHandler() {
-        System.out.println("Starting local Lambda test...");
-        
+    public void testLambdaHandler_Default() {
+        System.out.println("Starting local Lambda test (Default - Today)...");
+        runHandler(null);
+    }
+
+    @Test
+    public void testLambdaHandler_Yesterday() {
+        System.out.println("Starting local Lambda test (Yesterday)...");
+        Map<String, Object> input = new HashMap<>();
+        input.put("target", "yesterday");
+        runHandler(input);
+    }
+
+    @Test
+    public void testLambdaHandler_SpecificDate() {
+        System.out.println("Starting local Lambda test (Specific Date: 2026-05-10)...");
+        Map<String, Object> input = new HashMap<>();
+        input.put("date", "2026-05-10");
+        runHandler(input);
+    }
+
+    private void runHandler(Map<String, Object> input) {
         ChartGeneratorHandler handler = new ChartGeneratorHandler();
-        ScheduledEvent event = new ScheduledEvent();
-        
-        // We pass null for the Context as our current implementation doesn't strictly require it 
-        // (except for logging, which will just null-pointer if we don't handle it or use a mock).
-        // To be safe, I've updated the handler to use System.out if context is null, 
-        // but for a quick test, let's see how it behaves.
-        
         try {
-            String result = handler.handleRequest(event, new TestContext());
+            String result = handler.handleRequest(input, new TestContext());
             System.out.println("Result: " + result);
         } catch (Exception e) {
             e.printStackTrace();

@@ -28,7 +28,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
-public class ChartGeneratorHandler implements RequestHandler<ScheduledEvent, String> {
+public class ChartGeneratorHandler implements RequestHandler<Map<String, Object>, String> {
 
     private final DynamoDbClient dynamoDbClient;
     private final S3Client s3Client;
@@ -47,9 +47,22 @@ public class ChartGeneratorHandler implements RequestHandler<ScheduledEvent, Str
     }
 
     @Override
-    public String handleRequest(ScheduledEvent event, Context context) {
-        // Set to today's date: 2026-05-10
+    public String handleRequest(Map<String, Object> input, Context context) {
         LocalDate targetDate = LocalDate.now();
+
+        if (input != null) {
+            if (input.containsKey("date")) {
+                String dateInput = String.valueOf(input.get("date"));
+                try {
+                    targetDate = LocalDate.parse(dateInput);
+                } catch (Exception e) {
+                    context.getLogger().log("Invalid date format: " + dateInput + ". Expected YYYY-MM-DD. Defaulting to today.");
+                }
+            } else if ("yesterday".equalsIgnoreCase(String.valueOf(input.get("target")))) {
+                targetDate = targetDate.minusDays(1);
+            }
+        }
+
         String dateStr = targetDate.format(DateTimeFormatter.ofPattern("yyyyMMdd"));
         
         context.getLogger().log("Processing data for date: " + dateStr);
