@@ -71,12 +71,15 @@ public class ChartGenerator {
         plot.setOutlineVisible(false);
 
         NumberAxis rangeAxis = (NumberAxis) plot.getRangeAxis();
+
+        // Y min to be no more than 6.0
         if (minWaterLevel < 6.0) {
             rangeAxis.setLowerBound(minWaterLevel);
         } else {
             rangeAxis.setLowerBound(6.0);
         }
-        
+
+        // Y max to be not less than 20.0
         if (maxWaterLevel > 20.0) {
             rangeAxis.setUpperBound(50.0);
             rangeAxis.setTickUnit(new NumberTickUnit(5.0));
@@ -101,9 +104,9 @@ public class ChartGenerator {
         chart.draw(g2, new Rectangle2D.Double(0, margin, width, height));
         g2.dispose();
 
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        ImageIO.write(image, "png", baos);
-        return baos.toByteArray();
+        ByteArrayOutputStream chartByteStream = new ByteArrayOutputStream();
+        ImageIO.write(image, "png", chartByteStream);
+        return chartByteStream.toByteArray();
     }
 
     public void generateChart(List<WaterLevelData> data, String title, String filePath) throws IOException {
