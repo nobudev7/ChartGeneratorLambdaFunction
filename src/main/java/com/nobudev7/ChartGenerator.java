@@ -10,12 +10,15 @@ import org.jfree.chart.axis.Tick;
 import org.jfree.chart.plot.PlotOrientation;
 import org.jfree.chart.plot.XYPlot;
 import org.jfree.chart.ui.RectangleEdge;
+import org.jfree.chart.ui.RectangleInsets;
 import org.jfree.chart.ui.TextAnchor;
 import org.jfree.data.xy.XYSeries;
 import org.jfree.data.xy.XYSeriesCollection;
 
 import javax.imageio.ImageIO;
+import java.awt.BasicStroke;
 import java.awt.Color;
+import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
@@ -62,15 +65,20 @@ public class ChartGenerator {
         );
 
         chart.setBackgroundPaint(Color.WHITE);
+        chart.getTitle().setFont(new Font("SansSerif", Font.BOLD, 56));
+        chart.getTitle().setPadding(new RectangleInsets(10, 10, 28, 10));
 
         XYPlot plot = (XYPlot) chart.getPlot();
         plot.setBackgroundPaint(Color.WHITE);
         plot.setDomainGridlinesVisible(false);
         plot.setRangeGridlinePaint(Color.DARK_GRAY);
         plot.getRenderer().setSeriesPaint(0, new Color(42, 103, 194));
+        plot.getRenderer().setSeriesStroke(0, new BasicStroke(4.0f));
         plot.setOutlineVisible(false);
 
         NumberAxis rangeAxis = (NumberAxis) plot.getRangeAxis();
+        rangeAxis.setLabelFont(new Font("SansSerif", Font.PLAIN, 36));
+        rangeAxis.setTickLabelFont(new Font("SansSerif", Font.PLAIN, 24));
 
         // Y min to be no more than 6.0
         if (minWaterLevel < 6.0) {
@@ -90,7 +98,8 @@ public class ChartGenerator {
 
         plot.setDomainAxis(new HourlyNumberAxis(data));
         plot.getDomainAxis().setLabel("Time");
-        plot.getDomainAxis().setLabelFont(plot.getDomainAxis().getLabelFont().deriveFont(16f));
+        plot.getDomainAxis().setLabelFont(new Font("SansSerif", Font.PLAIN, 36));
+        plot.getDomainAxis().setTickLabelFont(new Font("SansSerif", Font.PLAIN, 24));
 
         int width = 1600;
         int height = 900;
@@ -131,13 +140,13 @@ public class ChartGenerator {
                 return ticks;
             }
 
-            DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
+            DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("H:mm");
 
             int lastHour = -1;
             for (int i = 0; i < data.size(); i++) {
                 LocalTime time = data.get(i).getTime();
                 int currentHour = time.getHour();
-                if (currentHour != lastHour) {
+                if (currentHour % 2 == 0 && currentHour != lastHour) {
                     ticks.add(new NumberTick(i, LocalTime.of(currentHour, 0).format(timeFormatter),
                             TextAnchor.TOP_CENTER, TextAnchor.CENTER, 0.0));
                     lastHour = currentHour;
