@@ -65,7 +65,7 @@ public class ChartGenerator {
         );
 
         chart.setBackgroundPaint(Color.WHITE);
-        chart.getTitle().setFont(new Font("SansSerif", Font.BOLD, 56));
+        chart.getTitle().setFont(new Font("SansSerif", Font.BOLD, 50));
         chart.getTitle().setPadding(new RectangleInsets(10, 10, 28, 10));
 
         XYPlot plot = (XYPlot) chart.getPlot();

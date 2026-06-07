@@ -144,14 +144,14 @@ To allow the scripts to communicate with AWS, the IAM user or role running them 
 }
 ```
 
-### `upload.py`
+### [upload.py](https://github.com/nobudev7/ChartGeneratorLambdaFunction/blob/main/raspberry-pi/upload.py)
 Used for real-time data uploads. It accepts three parameters: `Date`, `Time`, and `Level`.
 **Recommended Cron Job (every minute):**
 ```cronexp
 * * * * * /usr/bin/python3 /path/to/raspberry-pi/upload.py $(date +\%Y\%m\%d) $(date +\%H:\%M:\%S) $(/path/to/get_water_level.sh)
 ```
 
-### `batch_upload.py`
+### [batch_upload.py](https://github.com/nobudev7/ChartGeneratorLambdaFunction/blob/main/raspberry-pi/batch_upload.py)
 Used for uploading a full day's worth of data from a CSV file. It extracts the date from the filename (e.g., `waterlevel-20260510.csv`), parses the data, and batch writes 20 points at a time with a 1-second delay between batches to respect rate limits.
 **Recommended Cron Job (daily after midnight):**
 ```cronexp
