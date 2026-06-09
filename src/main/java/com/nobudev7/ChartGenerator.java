@@ -25,7 +25,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.time.LocalTime;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -143,13 +143,18 @@ public class ChartGenerator {
             DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("H:mm");
 
             int lastHour = -1;
+            ZonedDateTime lastTime = null;
+
             for (int i = 0; i < data.size(); i++) {
-                LocalTime time = data.get(i).getTime();
+                ZonedDateTime time = data.get(i).getTime();
                 int currentHour = time.getHour();
-                if (currentHour % 2 == 0 && currentHour != lastHour) {
-                    ticks.add(new NumberTick(i, LocalTime.of(currentHour, 0).format(timeFormatter),
+                
+                // Show tick every 2 hours, or if there's a timezone transition (offset change) at that hour
+                if (currentHour % 2 == 0 && (currentHour != lastHour || (lastTime != null && !time.getOffset().equals(lastTime.getOffset())))) {
+                    ticks.add(new NumberTick(i, time.format(timeFormatter),
                             TextAnchor.TOP_CENTER, TextAnchor.CENTER, 0.0));
                     lastHour = currentHour;
+                    lastTime = time;
                 }
             }
             return ticks;

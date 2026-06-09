@@ -2,7 +2,6 @@ package com.nobudev7;
 
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
-import com.amazonaws.services.lambda.runtime.events.ScheduledEvent;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
@@ -17,11 +16,15 @@ import com.google.gson.reflect.TypeToken;
 
 import java.io.InputStreamReader;
 import java.lang.reflect.Type;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +41,7 @@ public class ChartGeneratorHandler implements RequestHandler<Map<String, Object>
     private static final String TABLE_NAME = "Sump_Water_Level";
     private static final String BUCKET_NAME = "sump-water-level";
     private static final String FILE_LIST_JSON_KEY = "output/file-list.json";
+    private static final ZoneId ZONE_ID = ZoneId.of("America/New_York");
 
     public ChartGeneratorHandler() {
         this.dynamoDbClient = DynamoDbClient.create();
@@ -48,7 +52,7 @@ public class ChartGeneratorHandler implements RequestHandler<Map<String, Object>
 
     @Override
     public String handleRequest(Map<String, Object> input, Context context) {
-        LocalDate targetDate = LocalDate.now();
+        LocalDate targetDate = LocalDate.now(ZONE_ID);
 
         if (input != null) {
             if (input.containsKey("date")) {
@@ -68,7 +72,7 @@ public class ChartGeneratorHandler implements RequestHandler<Map<String, Object>
         context.getLogger().log("Processing data for date: " + dateStr);
 
         try {
-            List<WaterLevelData> data = fetchDataFromDynamoDB(dateStr);
+            List<WaterLevelData> data = fetchDataFromDynamoDB(dateStr, targetDate);
             if (data.isEmpty()) {
                 context.getLogger().log("No data found for " + dateStr);
                 return "No data found for " + dateStr;
@@ -91,7 +95,7 @@ public class ChartGeneratorHandler implements RequestHandler<Map<String, Object>
         }
     }
 
-    private List<WaterLevelData> fetchDataFromDynamoDB(String dateStr) {
+    private List<WaterLevelData> fetchDataFromDynamoDB(String dateStr, LocalDate targetDate) {
         QueryRequest queryRequest = QueryRequest.builder()
                 .tableName(TABLE_NAME)
                 .keyConditionExpression("#d = :dateValue")
@@ -100,15 +104,14 @@ public class ChartGeneratorHandler implements RequestHandler<Map<String, Object>
                 .build();
 
         QueryResponse response = dynamoDbClient.query(queryRequest);
-        
-        DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss");
 
         return response.items().stream()
                 .map(item -> {
-                    LocalTime time = LocalTime.parse(item.get("Time").s(), timeFormatter);
+                    ZonedDateTime zdt = Instant.parse(item.get("Timestamp").s()).atZone(ZONE_ID);
                     double level = Double.parseDouble(item.get("Level").n());
-                    return new WaterLevelData(time, level);
+                    return new WaterLevelData(zdt, level);
                 })
+                .sorted(Comparator.comparing(WaterLevelData::getTime))
                 .collect(Collectors.toList());
     }
 

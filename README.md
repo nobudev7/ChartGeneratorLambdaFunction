@@ -12,8 +12,8 @@ This project migrates the original [SumpDataVisualizer CLI tool](https://github.
 ## How it Works
 -   **Trigger:** Can be triggered manually, on a schedule (Amazon EventBridge), or via other AWS services.
 -   **Date Selection:** By default, it generates a chart for the current day. It can also be configured to generate a chart for "yesterday" or any specific date (see [Input Parameters](#input-parameters)).
--   **Data Retrieval:** Queries the `Sump_Water_Level` DynamoDB table using a partition key (`Date` in `YYYYMMDD`) and sort key (`Time` in `HH:MM:SS`).
--   **Chart Generation:** Uses `JFreeChart` to create a 1600x900 PNG image. The image is processed entirely in memory (as a `byte[]`) to avoid Lambda filesystem limitations.
+-   **Data Retrieval:** Queries the `Sump_Water_Level` DynamoDB table using a partition key (`Date` in local `YYYYMMDD`) and a sort key (`Timestamp` in UTC ISO-8601 `YYYY-MM-DDTHH:MM:SSZ`). This local date + UTC timestamp approach ensures perfect data ordering even during Daylight Saving Time (DST) transitions, allowing for accurate 23, 24, or 25-hour charts.
+-   **Chart Generation:** Uses `JFreeChart` to create a 1600x900 PNG image. The function automatically converts the UTC `Timestamp` back to the `America/New_York` timezone for human-readable X-axis labels. The image is processed entirely in memory (as a `byte[]`) to avoid Lambda filesystem limitations.
 -   **Storage & Organization:**
     -   Images are stored at: `output/YYYY/MM/waterlevel-YYYYMMDD.png`
     -   Metadata is stored at: `output/file-list.json`
@@ -118,7 +118,7 @@ mvn clean package
 The JAR will be located at: `target/ChartGeneratorLambdaFunction-1.0-SNAPSHOT.jar`.
 
 ## Supporting Scripts (Raspberry Pi)
-The `raspberry-pi/` directory contains Python scripts designed to run on a Raspberry Pi (or similar device) to feed data into the system.
+The `raspberry-pi/` directory contains Python scripts designed to run on a Raspberry Pi to feed data into the system.
 
 ### IAM Permissions (for Python Scripts)
 To allow the scripts to communicate with AWS, the IAM user or role running them must have the following policy. This grants the specific permissions required for both real-time and historical data ingestion:
@@ -144,11 +144,16 @@ To allow the scripts to communicate with AWS, the IAM user or role running them 
 }
 ```
 
-### [upload.py](https://github.com/nobudev7/ChartGeneratorLambdaFunction/blob/main/raspberry-pi/upload.py)
-Used for real-time data uploads. It accepts three parameters: `Date`, `Time`, and `Level`.
+### [depth.py](https://github.com/nobudev7/ChartGeneratorLambdaFunction/blob/main/raspberry-pi/depth.py)
+The primary script for measuring and uploading water level data.
+- **Measurement:** Uses a HC-SR04 ultrasonic sensor using pinsource library.
+- **Upload:** Directly uploads to DynamoDB following Local Date + UTC Timestamp strategy.
+- **Logging:** Appends measurements to a local CSV file in the `csv/` subfolder, organized by local date (e.g., `csv/2026-06-07.csv`).
+- **Error Handling:** Exits cleanly with a one-line stderr message if the sensor fails, preventing cron-job email spam.
+
 **Recommended Cron Job (every minute):**
 ```cronexp
-* * * * * /usr/bin/python3 /path/to/raspberry-pi/upload.py $(date +\%Y\%m\%d) $(date +\%H:\%M:\%S) $(/path/to/get_water_level.sh)
+* * * * * /usr/bin/python3 /path/to/raspberry-pi/depth.py
 ```
 
 ### [batch_upload.py](https://github.com/nobudev7/ChartGeneratorLambdaFunction/blob/main/raspberry-pi/batch_upload.py)
@@ -157,3 +162,6 @@ Used for uploading a full day's worth of data from a CSV file. It extracts the d
 ```cronexp
 5 0 * * * /usr/bin/python3 /path/to/raspberry-pi/batch_upload.py /path/to/data/waterlevel-$(date -d "yesterday" +\%Y\%m\%d).csv
 ```
+
+### [upload.py](https://github.com/nobudev7/ChartGeneratorLambdaFunction/blob/main/raspberry-pi/upload.py)
+*Deprecated:* Legacy script for uploading individual data points with local time.
