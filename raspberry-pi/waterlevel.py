@@ -19,9 +19,9 @@ def main():
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
-    liquid_depth = value.depth(raw_measurement, hole_depth)
-    if liquid_depth <= 0:
-        liquid_depth = 0.0
+    water_level = value.depth(raw_measurement, hole_depth)
+    if water_level <= 0:
+        water_level = 0.0
 
     # Strategy 1: Local Date for partitioning, UTC Timestamp for ordering
     now_local = datetime.now()
@@ -38,7 +38,7 @@ def main():
     data_point = {
         'Date': local_date_str,       # Partition Key: Local Date
         'Timestamp': utc_timestamp_str, # Sort Key: UTC Full Timestamp
-        'Level': Decimal(str(round(liquid_depth, 1)))
+        'Level': Decimal(str(round(water_level, 1)))
     }
 
     # Push to AWS
@@ -57,7 +57,7 @@ def main():
     csv_path = os.path.join(csv_dir, csv_filename)
     
     with open(csv_path, 'a') as f:
-        f.write(f"{utc_timestamp_str},{round(liquid_depth, 1)}\n")
+        f.write(f"{utc_timestamp_str},{round(water_level, 1)}\n")
 
 if __name__ == "__main__":
     main()
