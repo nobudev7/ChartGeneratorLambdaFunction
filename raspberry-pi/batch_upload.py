@@ -6,19 +6,19 @@ import re
 
 def main():
     parser = argparse.ArgumentParser(description='Upload CSV data to DynamoDB')
-    parser.add_argument('file_path', type=str, help='Path to the waterlevel-yyyymmdd.csv file')
+    parser.add_argument('file_path', type=str, help='Path to the YYYY-MM-DD.csv file')
     args = parser.parse_args()
 
     file_path = args.file_path
     filename = os.path.basename(file_path)
     
-    # Extract date from waterlevel-yyyymmdd.csv
-    match = re.search(r'waterlevel-(\d{8})\.csv', filename)
+    # Extract date from YYYY-MM-DD.csv
+    match = re.search(r'(\d{4})-(\d{2})-(\d{2})\.csv', filename)
     if not match:
-        print(f"Error: Filename '{filename}' does not match pattern waterlevel-yyyymmdd.csv")
+        print(f"Error: Filename '{filename}' does not match pattern YYYY-MM-DD.csv")
         return
     
-    date_str = match.group(1)
+    date_str = f"{match.group(1)}{match.group(2)}{match.group(3)}" # YYYYMMDD
     
     # Connect to DynamoDB
     dynamodb = boto3.client('dynamodb', region_name='us-east-1')
@@ -37,7 +37,7 @@ def main():
                 if len(parts) != 2:
                     continue
                 
-                time_str = parts[0]
+                timestamp_str = parts[0]
                 level_str = parts[1]
                 
                 # Prepare DynamoDB PutRequest item
@@ -45,7 +45,7 @@ def main():
                     'PutRequest': {
                         'Item': {
                             'Date': {'S': date_str},
-                            'Time': {'S': time_str},
+                            'Timestamp': {'S': timestamp_str},
                             'Level': {'N': str(level_str)}
                         }
                     }
@@ -67,8 +67,11 @@ def main():
         
         # Execute batch write
         try:
-            dynamodb.batch_write_item(RequestItems=request_items)
-            print(f"Uploaded batch {i//batch_size + 1} ({len(batch)} items)")
+            response = dynamodb.batch_write_item(RequestItems=request_items)
+            # Handle unprocessed items if any (simplified)
+            if response.get('UnprocessedItems') and response['UnprocessedItems']:
+                print(f"Warning: Some items were not processed in batch {i//batch_size + 1}")
+            print(f"Uploaded batch {i//batch_size + 1} (up to {len(batch)} items)")
         except Exception as e:
             print(f"Error uploading batch: {e}")
             break

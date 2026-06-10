@@ -16,7 +16,8 @@ def main():
         value = usonic.Measurement(trig_pin, echo_pin)
         raw_measurement = value.raw_distance()
     except SystemError as e:
-        print(f"Error: {e}", file=sys.stderr)
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"[{timestamp}] Error: {e}", file=sys.stderr)
         sys.exit(1)
 
     water_level = value.depth(raw_measurement, hole_depth)
@@ -45,7 +46,8 @@ def main():
     try:
         table.put_item(Item=data_point)
     except Exception as e:
-        print(f"Failed to upload data: {e}", file=sys.stderr)
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"[{timestamp}] Failed to upload data: {e}", file=sys.stderr)
         sys.exit(1)
 
     # Log to CSV
