@@ -73,7 +73,7 @@ public class ChartGenerator {
         plot.setDomainGridlinesVisible(false);
         plot.setRangeGridlinePaint(Color.DARK_GRAY);
         plot.getRenderer().setSeriesPaint(0, new Color(42, 103, 194));
-        plot.getRenderer().setSeriesStroke(0, new BasicStroke(4.0f));
+        plot.getRenderer().setSeriesStroke(0, new BasicStroke(2.0f));
         plot.setOutlineVisible(false);
 
         NumberAxis rangeAxis = (NumberAxis) plot.getRangeAxis();
