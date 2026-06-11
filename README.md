@@ -118,14 +118,63 @@ mvn clean package
 The JAR will be located at: `target/ChartGeneratorLambdaFunction-1.0-SNAPSHOT.jar`.
 
 ## Supporting Scripts (Raspberry Pi)
-The `raspberry-pi/` directory contains Python scripts designed to run on a Raspberry Pi to feed data into the system.
+The `raspberry-pi/` directory contains a modular Python suite designed to run on a Raspberry Pi to monitor water levels, log data, and send smart alerts.
+
+### Configuration
+The system uses environment variables for all hardware, AWS, and alerting settings. This allows you to manage secrets (like Gmail passwords) and hardware pins without modifying the code.
+
+**Environment Variables:**
+
+| Variable | Description | Default |
+| :--- | :--- | :--- |
+| `TRIG_PIN` | GPIO pin for Trigger | `3` |
+| `ECHO_PIN` | GPIO pin for Echo | `14` |
+| `HOLE_DEPTH` | Depth from sensor to bottom (cm) | `61.0` |
+| `AWS_REGION` | AWS Region for DynamoDB | `us-east-1` |
+| `DYNAMO_TABLE` | DynamoDB Table Name | `Sump_Water_Level` |
+| `ENABLE_ALERTS` | Set to `true` to enable email notifications | `false` |
+| `ALERT_THRESHOLD_CM`| Water level threshold for alerts | `25.0` |
+| `GMAIL_USER` | Your Gmail address (for sending alerts) | |
+| `GMAIL_PASS` | Gmail **App Password** (16 characters) | |
+| `ALERT_RECIPIENT` | Destination email address | |
+
+### [waterlevel.py](https://github.com/nobudev7/ChartGeneratorLambdaFunction/blob/main/raspberry-pi/waterlevel.py)
+The primary orchestrator script.
+- **Measurement:** Uses a HC-SR04 ultrasonic sensor.
+- **Upload:** Pushes measurements to DynamoDB (Partition Key: `Date`, Sort Key: `Timestamp`).
+- **Logging:** Appends measurements to a local CSV file in the `csv/` subfolder, organized by local date (e.g., `csv/2026-06-09.csv`).
+- **Analysis & Alerting:** Automatically invokes the analyzer and notifier modules.
+
+**Smart Alerting Logic:**
+- **Validation:** Only alerts if the water level rise is confirmed (verified against 5 past readings and 2 subsequent readings). Filters out sensor spikes/noise.
+- **Throttling:** Sends the first alert **immediately** upon detection. If the high-water condition persists, it throttles further emails to **once per hour**. It automatically resets once the water level returns to normal.
+
+**Recommended Cron Job (every minute):**
+```cronexp
+* * * * * /bin/bash /path/to/run_waterlevel.sh
+```
+
+### Modular Components
+- **[config.py](https://github.com/nobudev7/ChartGeneratorLambdaFunction/blob/main/raspberry-pi/config.py):** Centralizes all environment-based settings and hardware defaults.
+- **[analyzer.py](https://github.com/nobudev7/ChartGeneratorLambdaFunction/blob/main/raspberry-pi/analyzer.py):** Implements trend validation logic. It handles the midnight transition by seamlessly reading across daily CSV boundaries to maintain a continuous 8-sample analysis window.
+- **[notifier.py](https://github.com/nobudev7/ChartGeneratorLambdaFunction/blob/main/raspberry-pi/notifier.py):** Handles Gmail SMTP communication. It generates professional emails containing a localized trend table (History + Verification samples) to provide immediate context to the recipient.
+- **[test_notifier.py](https://github.com/nobudev7/ChartGeneratorLambdaFunction/blob/main/raspberry-pi/test_notifier.py):** A standalone utility to verify your Gmail SMTP settings and App Password by sending a simulated alert.
+
+### [batch_upload.py](https://github.com/nobudev7/ChartGeneratorLambdaFunction/blob/main/raspberry-pi/batch_upload.py)
+Used for bulk-uploading data from daily CSV files (format: `YYYY-MM-DD.csv`). It infers the partition key from the filename and the sort key from the UTC timestamps within the file. It uses DynamoDB `BatchWriteItem` (20 items per request) for efficiency.
+
+**Recommended usage for historical data:**
+```bash
+python3 raspberry-pi/batch_upload.py /path/to/csv/2026-06-08.csv
+```
+
+### [upload.py](https://github.com/nobudev7/ChartGeneratorLambdaFunction/blob/main/raspberry-pi/upload.py)
+*Obsolete:* Legacy script for individual point uploads. Replaced by the modular features in `waterlevel.py`.
 
 ### IAM Permissions (for Python Scripts)
-To allow the scripts to communicate with AWS, the IAM user or role running them must have the following policy. This grants the specific permissions required for both real-time and historical data ingestion:
-
-- **`dynamodb:PutItem`**: Required for `upload.py` to insert individual water level readings every minute.
-- **`dynamodb:UpdateItem`**: Allows for granular updates to existing data points if necessary.
-- **`dynamodb:BatchWriteItem`**: Required for `batch_upload.py` to efficiently upload multiple historical records in a single request.
+The IAM user or role running these scripts requires:
+- **`dynamodb:PutItem`**: For real-time monitoring (`waterlevel.py`).
+- **`dynamodb:BatchWriteItem`**: For bulk uploads (`batch_upload.py`).
 
 ```json
 {
@@ -135,33 +184,10 @@ To allow the scripts to communicate with AWS, the IAM user or role running them 
             "Effect": "Allow",
             "Action": [
                 "dynamodb:PutItem",
-                "dynamodb:UpdateItem",
                 "dynamodb:BatchWriteItem"
             ],
-            "Resource": "arn:aws:dynamodb:<REGION>:<YOUR_ACCOUNT_ID>:table/<TABLE_NAME>"
+            "Resource": "arn:aws:dynamodb:<REGION>:<ACCOUNT_ID>:table/Sump_Water_Level"
         }
     ]
 }
 ```
-
-### [depth.py](https://github.com/nobudev7/ChartGeneratorLambdaFunction/blob/main/raspberry-pi/depth.py)
-The primary script for measuring and uploading water level data.
-- **Measurement:** Uses a HC-SR04 ultrasonic sensor using pinsource library.
-- **Upload:** Directly uploads to DynamoDB following Local Date + UTC Timestamp strategy.
-- **Logging:** Appends measurements to a local CSV file in the `csv/` subfolder, organized by local date (e.g., `csv/2026-06-07.csv`).
-- **Error Handling:** Exits cleanly with a one-line stderr message if the sensor fails, preventing cron-job email spam.
-
-**Recommended Cron Job (every minute):**
-```cronexp
-* * * * * /usr/bin/python3 /path/to/raspberry-pi/depth.py
-```
-
-### [batch_upload.py](https://github.com/nobudev7/ChartGeneratorLambdaFunction/blob/main/raspberry-pi/batch_upload.py)
-Used for uploading a full day's worth of data from a CSV file. It extracts the date from the filename (e.g., `waterlevel-20260510.csv`), parses the data, and batch writes 20 points at a time with a 1-second delay between batches to respect rate limits.
-**Recommended Cron Job (daily after midnight):**
-```cronexp
-5 0 * * * /usr/bin/python3 /path/to/raspberry-pi/batch_upload.py /path/to/data/waterlevel-$(date -d "yesterday" +\%Y\%m\%d).csv
-```
-
-### [upload.py](https://github.com/nobudev7/ChartGeneratorLambdaFunction/blob/main/raspberry-pi/upload.py)
-*Deprecated:* Legacy script for uploading individual data points with local time.

@@ -17,3 +17,4 @@ output/
 
 ### Mac OS ###
 .DS_Store
+raspberry-pi/__pycache__
