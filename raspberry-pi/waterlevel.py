@@ -8,9 +8,14 @@ from pinsource import usonic
 def main():
     """Measure water level using a HCSR04 sensor and upload to DynamoDB with locale time partitioning."""
 
-    trig_pin = 3
-    echo_pin = 14
-    hole_depth = 61  # centimeters
+    # Hardware Configuration
+    trig_pin = int(os.environ.get('TRIG_PIN', 3))
+    echo_pin = int(os.environ.get('ECHO_PIN', 14))
+    hole_depth = float(os.environ.get('HOLE_DEPTH', 61))
+
+    # AWS Configuration
+    region = os.environ.get('AWS_REGION', 'us-east-1')
+    table_name = os.environ.get('DYNAMO_TABLE', 'Sump_Water_Level')
 
     try:
         value = usonic.Measurement(trig_pin, echo_pin)
@@ -32,8 +37,8 @@ def main():
     utc_timestamp_str = now_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # Connect to DynamoDB
-    dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
-    table = dynamodb.Table('Sump_Water_Level')
+    dynamodb = boto3.resource('dynamodb', region_name=region)
+    table = dynamodb.Table(table_name)
 
     # Data to upload
     data_point = {
