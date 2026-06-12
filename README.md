@@ -132,6 +132,7 @@ The system uses environment variables for all hardware, AWS, and alerting settin
 | `HOLE_DEPTH` | Depth from sensor to bottom (cm) | `61.0` |
 | `AWS_REGION` | AWS Region for DynamoDB | `us-east-1` |
 | `DYNAMO_TABLE` | DynamoDB Table Name | `Sump_Water_Level` |
+| `CSV_DIR` | **Mandatory** absolute path to the CSV logging folder | |
 | `ENABLE_ALERTS` | Set to `true` to enable email notifications | `false` |
 | `ALERT_THRESHOLD_CM`| Water level threshold for alerts | `25.0` |
 | `GMAIL_USER` | Your Gmail address (for sending alerts) | |
@@ -142,12 +143,13 @@ The system uses environment variables for all hardware, AWS, and alerting settin
 The primary orchestrator script.
 - **Measurement:** Uses a HC-SR04 ultrasonic sensor.
 - **Upload:** Pushes measurements to DynamoDB (Partition Key: `Date`, Sort Key: `Timestamp`).
-- **Logging:** Appends measurements to a local CSV file in the `csv/` subfolder, organized by local date (e.g., `csv/2026-06-09.csv`).
-- **Analysis & Alerting:** Automatically invokes the analyzer and notifier modules.
+- **Logging:** Appends measurements to a daily CSV file (e.g., `2026-06-09.csv`) in the directory specified by `CSV_DIR`.
+- **Alerting:** Directly monitors the water level against the `ALERT_THRESHOLD_CM`.
 
-**Smart Alerting Logic:**
-- **Validation:** Only alerts if the water level rise is confirmed (verified against 5 past readings and 2 subsequent readings). Filters out sensor spikes/noise.
-- **Throttling:** Sends the first alert **immediately** upon detection. If the high-water condition persists, it throttles further emails to **once per hour**. It automatically resets once the water level returns to normal.
+**Throttled Alerting Logic:**
+- **Trigger:** Sends an alert **immediately** as soon as a single reading crosses the threshold.
+- **Throttling:** If the high-water condition persists, it throttles further emails to **once per hour** to prevent inbox flooding.
+- **Auto-Reset:** Automatically resets the throttle state once the water level returns to normal.
 
 **Recommended Cron Job (every minute):**
 ```cronexp
@@ -156,12 +158,11 @@ The primary orchestrator script.
 
 ### Modular Components
 - **[config.py](https://github.com/nobudev7/ChartGeneratorLambdaFunction/blob/main/raspberry-pi/config.py):** Centralizes all environment-based settings and hardware defaults.
-- **[analyzer.py](https://github.com/nobudev7/ChartGeneratorLambdaFunction/blob/main/raspberry-pi/analyzer.py):** Implements trend validation logic. It handles the midnight transition by seamlessly reading across daily CSV boundaries to maintain a continuous 8-sample analysis window.
-- **[notifier.py](https://github.com/nobudev7/ChartGeneratorLambdaFunction/blob/main/raspberry-pi/notifier.py):** Handles Gmail SMTP communication. It generates professional emails containing a localized trend table (History + Verification samples) to provide immediate context to the recipient.
+- **[notifier.py](https://github.com/nobudev7/ChartGeneratorLambdaFunction/blob/main/raspberry-pi/notifier.py):** Handles Gmail SMTP communication. It generates simple, immediate alert emails.
 - **[test_notifier.py](https://github.com/nobudev7/ChartGeneratorLambdaFunction/blob/main/raspberry-pi/test_notifier.py):** A standalone utility to verify your Gmail SMTP settings and App Password by sending a simulated alert.
 
 ### [batch_upload.py](https://github.com/nobudev7/ChartGeneratorLambdaFunction/blob/main/raspberry-pi/batch_upload.py)
-Used for bulk-uploading data from daily CSV files (format: `YYYY-MM-DD.csv`). It infers the partition key from the filename and the sort key from the UTC timestamps within the file. It uses DynamoDB `BatchWriteItem` (20 items per request) for efficiency.
+Used for bulk-uploading data from daily CSV files (format: `YYYY-MM-DD.csv`). It infers the partition key from the filename and the sort key from the UTC timestamps within the file. It uses DynamoDB `BatchWriteItem` (25 items per request) for efficiency.
 
 **Recommended usage for historical data:**
 ```bash

@@ -27,19 +27,9 @@ def test_email():
     alert_level = 25.5
     alert_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    # Simulate a rising trend for the context table
-    context = [
-        {'timestamp': '2026-06-09 10:00:00', 'level': 10.2},
-        {'timestamp': '2026-06-09 10:01:00', 'level': 12.5},
-        {'timestamp': '2026-06-09 10:02:00', 'level': 18.0},
-        {'timestamp': alert_time,           'level': alert_level},
-        {'timestamp': '2026-06-09 10:04:00', 'level': 26.1},
-        {'timestamp': '2026-06-09 10:05:00', 'level': 25.8},
-    ]
-
     # 4. Attempt to send
     print("\nAttempting to send test email...")
-    success = notifier.send_alert(alert_level, alert_time, context)
+    success = notifier.send_alert(alert_level, alert_time)
 
     if success:
         print("\nSUCCESS! Check your inbox.")

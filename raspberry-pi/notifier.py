@@ -10,10 +10,9 @@ class AlertNotifier:
         self.smtp_pass = smtp_pass
         self.recipient = recipient
 
-    def send_alert(self, alert_level, alert_timestamp, context_readings):
+    def send_alert(self, alert_level, alert_timestamp):
         """
-        Sends an alert email with trend context.
-        context_readings: list of dicts containing {'timestamp': str, 'level': float}
+        Sends an alert email.
         """
         if not self.smtp_user or not self.smtp_pass or not self.recipient:
             print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Notifier Error: Email credentials or recipient not configured.", file=sys.stderr)
@@ -21,21 +20,11 @@ class AlertNotifier:
 
         subject = f"ALERT: High Water Level Detected - {alert_level} cm"
         
-        # Build trend table for the email body
-        trend_table = "Time (Local)          | Level (cm)\n"
-        trend_table += "----------------------|-----------\n"
-        for r in context_readings:
-            # Highlight the alert point in the list
-            marker = "  <-- ALERT" if r['timestamp'] == alert_timestamp else ""
-            trend_table += f"{r['timestamp']} | {r['level']:>9.1f}{marker}\n"
-
         body = (
             f"High water level alert triggered.\n\n"
             f"Summary:\n"
             f"  - Alert Level: {alert_level} cm\n"
             f"  - Event Time: {alert_timestamp}\n\n"
-            f"Trend Context (History + Verification):\n"
-            f"{trend_table}\n"
             f"Please check the sump pump immediately."
         )
 

@@ -7,7 +7,6 @@ from pinsource import usonic
 
 import config
 from notifier import AlertNotifier
-from analyzer import TrendAnalyzer
 
 STATE_FILE = os.path.join(os.path.dirname(__file__), 'alert_state.txt')
 
@@ -107,26 +106,19 @@ def main():
     with open(csv_path, 'a') as f:
         f.write(f"{utc_timestamp_str},{round(water_level, 1)}\n")
 
-    # Alerting and Trend Analysis Logic
-    analyzer = TrendAnalyzer()
-    notifier = AlertNotifier(config.GMAIL_USER, config.GMAIL_PASS, config.ALERT_RECIPIENT)
-    
-    readings = analyzer.get_readings_from_csv(config.CSV_DIR, now_local)
-    verified_alert = analyzer.analyze(readings)
-    
-    if verified_alert:
+    # Alerting Logic - Simple Threshold Check
+    if water_level >= config.ALERT_THRESHOLD_CM:
         if should_send_alert():
+            notifier = AlertNotifier(config.GMAIL_USER, config.GMAIL_PASS, config.ALERT_RECIPIENT)
             if config.ENABLE_ALERTS and notifier.send_alert(
-                alert_level=verified_alert['level'],
-                alert_timestamp=verified_alert['timestamp'],
-                context_readings=readings
+                alert_level=round(water_level, 1),
+                alert_timestamp=now_local.strftime("%Y-%m-%d %H:%M:%S")
             ):
                 update_alert_state()
     else:
         # If the water level is safely below the threshold, reset the alerting state
         # so that the next time it rises, an immediate alert is triggered.
-        if water_level < config.ALERT_THRESHOLD_CM:
-            clear_alert_state()
+        clear_alert_state()
 
 if __name__ == "__main__":
     main()
