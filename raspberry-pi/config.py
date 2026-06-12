@@ -13,7 +13,7 @@ DYNAMO_TABLE = os.environ.get('DYNAMO_TABLE', 'Sump_Water_Level')
 ENABLE_ALERTS = os.environ.get('ENABLE_ALERTS', 'false').lower() == 'true'
 ALERT_THRESHOLD_CM = float(os.environ.get('ALERT_THRESHOLD_CM', 25.0))
 # CSV Path for history analysis
-CSV_DIR = os.path.join(os.path.dirname(__file__), 'csv')
+CSV_DIR = os.environ.get('CSV_DIR')
 
 # Email Configuration (Gmail SMTP)
 # Note: Use a Gmail "App Password", not your regular password.

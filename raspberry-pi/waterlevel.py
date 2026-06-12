@@ -90,7 +90,15 @@ def main():
 
     # Log to CSV
     csv_dir = config.CSV_DIR
-    os.makedirs(csv_dir, exist_ok=True)
+    if not csv_dir:
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"[{timestamp}] Error: CSV_DIR environment variable is not set.", file=sys.stderr)
+        sys.exit(1)
+    
+    if not os.path.isdir(csv_dir):
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"[{timestamp}] Error: CSV_DIR '{csv_dir}' does not exist or is not a directory.", file=sys.stderr)
+        sys.exit(1)
     
     # Use local date for filename to match the "one day" grouping
     csv_filename = now_local.strftime("%Y-%m-%d.csv")
