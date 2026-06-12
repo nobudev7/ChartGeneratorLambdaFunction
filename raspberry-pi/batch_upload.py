@@ -3,6 +3,7 @@ import argparse
 import time
 import os
 import re
+import config
 
 def main():
     parser = argparse.ArgumentParser(description='Upload CSV data to DynamoDB')
@@ -20,9 +21,9 @@ def main():
     
     date_str = f"{match.group(1)}{match.group(2)}{match.group(3)}" # YYYYMMDD
     
-    # Connect to DynamoDB
-    dynamodb = boto3.client('dynamodb', region_name='us-east-1')
-    table_name = 'Sump_Water_Level'
+    # Connect to DynamoDB using config
+    dynamodb = boto3.client('dynamodb', region_name=config.AWS_REGION)
+    table_name = config.DYNAMO_TABLE
 
     # Read and parse data
     items = []
@@ -54,7 +55,7 @@ def main():
         print(f"Error: File not found at {file_path}")
         return
 
-    print(f"Starting upload for date {date_str} ({len(items)} items total)...")
+    print(f"Starting upload for date {date_str} ({len(items)} items total) to table '{table_name}'...")
 
     # Batch write 20 items at a time
     batch_size = 20
