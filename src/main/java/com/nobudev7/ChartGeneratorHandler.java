@@ -33,6 +33,11 @@ import java.util.stream.Collectors;
 
 public class ChartGeneratorHandler implements RequestHandler<Map<String, Object>, String> {
 
+    static {
+        // Fix for "Fontconfig error: No writable cache directories" in AWS Lambda
+        System.setProperty("user.home", "/tmp");
+    }
+
     private final DynamoDbClient dynamoDbClient;
     private final S3Client s3Client;
     private final ChartGenerator chartGenerator;

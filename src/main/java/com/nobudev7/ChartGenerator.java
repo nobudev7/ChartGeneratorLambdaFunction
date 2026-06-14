@@ -32,6 +32,24 @@ import java.util.List;
 
 public class ChartGenerator {
 
+    private final double minUpperBound;
+
+    public ChartGenerator() {
+        this.minUpperBound = getEnvDouble("CHART_MIN_UPPER_BOUND", 20.0);
+    }
+
+    private double getEnvDouble(String key, double defaultValue) {
+        String val = System.getenv(key);
+        if (val != null && !val.isEmpty()) {
+            try {
+                return Double.parseDouble(val);
+            } catch (NumberFormatException e) {
+                // Use default if parsing fails
+            }
+        }
+        return defaultValue;
+    }
+
     public byte[] generateChart(List<WaterLevelData> data, String title) throws IOException {
         if (data == null || data.isEmpty()) {
             return null;
@@ -87,13 +105,18 @@ public class ChartGenerator {
             rangeAxis.setLowerBound(6.0);
         }
 
-        // Y max to be not less than 20.0
-        if (maxWaterLevel > 20.0) {
-            rangeAxis.setUpperBound(50.0);
-            rangeAxis.setTickUnit(new NumberTickUnit(5.0));
-        } else {
-            rangeAxis.setUpperBound(20.0);
+        // Y max logic: Dynamic upper bound with 1cm margin and 10cm increments
+        double dynamicUpperBound = Math.ceil((maxWaterLevel + 0.9) / 10.0) * 10.0;
+        double finalUpperBound = Math.max(dynamicUpperBound, minUpperBound);
+        rangeAxis.setUpperBound(finalUpperBound);
+
+        double currentUpperBound = rangeAxis.getUpperBound();
+        if (currentUpperBound < 20.0) {
+            rangeAxis.setTickUnit(new NumberTickUnit(1.0));
+        } else if (currentUpperBound <= 30.0) {
             rangeAxis.setTickUnit(new NumberTickUnit(2.0));
+        } else {
+            rangeAxis.setTickUnit(new NumberTickUnit(5.0));
         }
 
         plot.setDomainAxis(new HourlyNumberAxis(data));

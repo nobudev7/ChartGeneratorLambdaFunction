@@ -56,14 +56,26 @@ public class ChartGeneratorTest {
             assertFalse(data.isEmpty(), "Data for " + fileName + " should not be empty");
 
             // 4. Generate chart
-            String datePart = baseName.replace("waterlevel-", ""); // YYYYMMDD
-            String formattedDate = datePart.substring(0, 4) + "/" + datePart.substring(4, 6) + "/" + datePart.substring(6, 8);
+            LocalDate fileDate = parseDateFromFileName(fileName);
+            String formattedDate = fileDate.format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
             generator.generateChart(data, "Water Level - " + formattedDate, outputFilePath);
 
             // 5. Verify output
             File outputFile = new File(outputFilePath);
             assertTrue(outputFile.exists(), "Output chart file should exist for " + fileName);
             assertTrue(outputFile.length() > 0, "Output chart file should not be empty for " + fileName);
+        }
+    }
+
+    private LocalDate parseDateFromFileName(String fileName) {
+        String baseName = fileName.replace(".csv", "");
+        if (baseName.startsWith("waterlevel-")) {
+            // Format: waterlevel-YYYYMMDD.csv
+            String datePart = baseName.replace("waterlevel-", "");
+            return LocalDate.parse(datePart, DateTimeFormatter.ofPattern("yyyyMMdd"));
+        } else {
+            // Format: YYYY-MM-DD.csv
+            return LocalDate.parse(baseName, DateTimeFormatter.ISO_LOCAL_DATE);
         }
     }
 
@@ -97,18 +109,23 @@ public class ChartGeneratorTest {
         List<WaterLevelData> dataList = new ArrayList<>();
         DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss");
         
-        // Extract date from filename (waterlevel-YYYYMMDD.csv)
-        String datePart = fileName.replace("waterlevel-", "").replace(".csv", "");
-        LocalDate fileDate = LocalDate.parse(datePart, DateTimeFormatter.ofPattern("yyyyMMdd"));
+        // Use helper to extract date from filename
+        LocalDate fileDate = parseDateFromFileName(fileName);
 
         try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
             String line;
             while ((line = br.readLine()) != null) {
                 String[] parts = line.split(",");
                 if (parts.length == 2) {
-                    LocalTime time = LocalTime.parse(parts[0], timeFormatter);
-                    // Treat as local time on the file date
-                    ZonedDateTime zdt = time.atDate(fileDate).atZone(ZONE_ID);
+                    ZonedDateTime zdt;
+                    if (parts[0].contains("T")) {
+                        // Format: 2026-06-13T04:00:07Z (ISO-8601 UTC)
+                        zdt = java.time.Instant.parse(parts[0]).atZone(ZONE_ID);
+                    } else {
+                        // Format: HH:mm:ss (Local time on the file date)
+                        LocalTime time = LocalTime.parse(parts[0], timeFormatter);
+                        zdt = time.atDate(fileDate).atZone(ZONE_ID);
+                    }
                     double waterLevel = Double.parseDouble(parts[1]);
                     dataList.add(new WaterLevelData(zdt, waterLevel));
                 }
