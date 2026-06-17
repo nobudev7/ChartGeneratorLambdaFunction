@@ -9,6 +9,8 @@ This project migrates the original [SumpDataVisualizer CLI tool](https://github.
 3.  Uploads the chart to an S3 bucket with organized directory structures.
 4.  Updates a central `file-list.json` on S3 to ensure the frontend website can discover new images immediately.
 
+Note: The static website code is the same as in SumpDataVisualizer CLI [html folder](https://github.com/nobudev7/SumpDataVisualizerCli/tree/main/html).
+
 ## How it Works
 -   **Trigger:** Can be triggered manually, on a schedule (Amazon EventBridge), or via other AWS services.
 -   **Date Selection:** By default, it generates a chart for the current day. It can also be configured to generate a chart for "yesterday" or any specific date (see [Input Parameters](#input-parameters)).
@@ -18,6 +20,8 @@ This project migrates the original [SumpDataVisualizer CLI tool](https://github.
     -   Images are stored at: `output/YYYY/MM/waterlevel-YYYYMMDD.png`
     -   Metadata is stored at: `output/file-list.json`
 -   **Cache Management:** To ensure CloudFront serves fresh content without manual invalidations, the function sets a `Cache-Control: max-age=60` header on all S3 uploads.
+
+![System Diagram](images/WaterLevelMonitoringArchitecture-AWS.png)
 
 ## Input Parameters
 The Lambda function accepts a JSON payload to control which date the chart is generated for:
