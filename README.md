@@ -196,3 +196,40 @@ The IAM user or role running these scripts requires:
     ]
 }
 ```
+
+## Heartbeat Monitor (Device Offline Alert)
+
+To ensure the IoT device (Raspberry Pi) is actively running and uploading data, a heartbeat monitor is configured using a zero-code approach via Amazon CloudWatch Alarms and Amazon Simple Notification Service (SNS). If the Pi stops writing to DynamoDB, you will receive an email alert.
+
+### Step 1: Create SNS Topic & Subscription
+1. Open the **Amazon SNS** console.
+2. Create a standard Topic named `SumpPumpHeartbeatAlerts`.
+3. Create a subscription to the topic:
+   - **Protocol**: Email
+   - **Endpoint**: Your email address
+4. Confirm the subscription by clicking the verification link in the email sent by AWS.
+
+### Step 2: Create a CloudWatch Alarm
+1. Open the **Amazon CloudWatch** console and go to **Alarms** -> **All Alarms** -> **Create alarm**.
+2. Click **Select metric** -> **DynamoDB** -> **Table Metrics**.
+3. Select the **`ConsumedWriteCapacityUnits`** metric for the `Sump_Water_Level` table.
+4. Configure the metric details:
+   - **Statistic**: `Sum`
+   - **Period**: `5 minutes` (or `10 minutes` to allow for slight transmission/timing drift)
+5. Configure the conditions:
+   - **Threshold type**: Static
+   - **Whenever metric is**: `Lower/Equal` than `0` (or `Lower than 1`)
+6. **Configure Missing Data Treatment (CRITICAL)**:
+   - Under **Additional configuration**, find **Missing data treatment** and set it to **Treat missing data as bad (breaching)**.
+   
+   > [!IMPORTANT]
+   > Setting this to *breaching* is critical because when the Pi goes offline, it stops sending any writes. This leads to a complete absence of data points (missing data) rather than a value of `0`. Treating missing data as breaching ensures the alarm triggers.
+   ![CloudWatch Conditions](images/CloudWatchHeartbeatConditions.png)
+   
+
+7. Configure actions:
+   - **Alarm state trigger**: `In alarm`
+   - **Send a notification to**: Select the `SumpPumpHeartbeatAlerts` SNS topic.
+   - *(Optional)* Configure the `OK` state trigger to notify you when the device recovers and resumes uploading.
+8. Name the alarm (e.g., `SumpPumpHeartbeatFailure`) and complete the creation process.
+
