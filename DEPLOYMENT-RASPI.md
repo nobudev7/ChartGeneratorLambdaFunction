@@ -10,6 +10,18 @@ graph LR
     TS -- "Deploy (Rsync over SSH)" --> Pi[Raspberry Pi]
 ```
 
+## Deployment Strategy
+For this project, Raspberry Pi runs the Python script periodically via a `cron` job (e.g. every minute), writing updated Python scripts directly into the active folder poses risks:
+1. **Single-file corruption**: Opening or importing a file while it is being partially written.
+2. **Multi-file inconsistency**: Loading a new `config.py` but an old `waterlevel.py` because the file transfers occurred sequentially.
+
+**Collision Avoidance & Zero-Downtime Swaps**
+
+To eliminate these risks, we use an **atomic symlink swap pattern** (commonly referred to as blue-green deployments at the directory level):
+1. The GitHub Action uploads all files to a temporary `staging/` directory using `rsync`.
+2. Once the transfer completes, the files are copied into a unique, timestamped release directory (e.g., `releases/20260620_094000/`).
+3. We update a symlink (`current`) to point to the new directory. The OS swaps the symlink target **atomically**, ensuring any running cron job or starting service sees either 100% of the old version or 100% of the new version.
+
 ---
 
 ## Step 1: Set Up Tailscale (For Secure Network Connectivity)
@@ -75,16 +87,12 @@ In your GitHub repository, navigate to **Settings** -> **Secrets and variables**
 
 ---
 
-## Step 4: Collision Avoidance & Zero-Downtime Swaps
-If your Raspberry Pi runs the Python script periodically via a `cron` job (e.g. every minute) or continuously, writing files directly into the active folder poses risks:
-1. **Single-file corruption**: Opening or importing a file while it is being partially written.
-2. **Multi-file inconsistency**: Loading a new `config.py` but an old `waterlevel.py` because the file transfers occurred sequentially.
+## Step 4:
+Prepare the target folder on the Raspberry Pi. This folder will be the upload target of the script files.
 
-To eliminate these risks, we use an **atomic symlink swap pattern** (commonly referred to as blue-green deployments at the directory level):
-1. The GitHub Action uploads all files to a temporary `staging/` directory using `rsync`.
-2. Once the transfer completes, the files are copied into a unique, timestamped release directory (e.g., `releases/20260620_094000/`).
-3. We update a symlink (`current`) to point to the new directory. The OS swaps the symlink target **atomically**, ensuring any running cron job or starting service sees either 100% of the old version or 100% of the new version.
-
+```bash
+mikdir -p /home/pisonic/waterlevel-monitor/staging
+```
 ---
 
 ## Step 5: Create the GitHub Actions Workflow
