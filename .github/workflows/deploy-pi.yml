@@ -1,0 +1,54 @@
+name: Deploy Python Scripts to Raspberry Pi
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'raspberry-pi/**' # Only run when code in the raspberry-pi folder changes
+  workflow_dispatch: # Allows manual trigger from the GitHub Actions tab without making a commit
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Check out the repository
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 2. Connect to your private Tailscale network
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+
+
+      # 3. Deploy the files to a staging directory via rsync
+      - name: Deploy files to Staging
+        uses: easingthemes/ssh-deploy@main
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          ARGS: "-rlgoDzvO --delete" # Rsync flags
+          SOURCE: "raspberry-pi/"
+          REMOTE_HOST: ${{ secrets.PI_IP }}
+          REMOTE_USER: ${{ secrets.PI_USER }}
+          TARGET: "/home/${{ secrets.PI_USER }}/waterlevel-monitor/staging"
+          
+          # Move staging to a timestamped folder and swap the symlink atomically
+          SCRIPT_AFTER: |
+            TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+            RELEASE_DIR="/home/${{ secrets.PI_USER }}/waterlevel-monitor/releases/$TIMESTAMP"
+            CURRENT_LINK="/home/${{ secrets.PI_USER }}/waterlevel-monitor/current"
+            
+            echo "Creating release: $RELEASE_DIR"
+            mkdir -p "$RELEASE_DIR"
+            cp -r /home/${{ secrets.PI_USER }}/waterlevel-monitor/staging/* "$RELEASE_DIR/"
+            
+            echo "Swapping symlink atomically..."
+            ln -sfn "$RELEASE_DIR" "$CURRENT_LINK"
+            
+            echo "Cleaning up old releases (keeping last 5)..."
+            cd /home/${{ secrets.PI_USER }}/waterlevel-monitor/releases && ls -t | tail -n +6 | xargs rm -rf
