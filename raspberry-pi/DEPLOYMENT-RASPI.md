@@ -36,7 +36,7 @@ Instead of forwarding ports on your home router (which exposes your network to t
    - Log into your **Tailscale Admin Console**, go to **Settings**, and select **Trust credentials** (previously named OAuth).
    - Click **Generate OAuth client...**.
    - Under **Scopes**, look for **Auth keys** and grant it **Write** access (`auth_keys:write`). This allows the credential to dynamically generate keys to authenticate the ephemeral GitHub Action runner.
-   - Under **Tags**, select the tags that this client is allowed to apply to the runner device (for example, `tag:ci`). 
+   - Under **Tags**, select the tags that this client is allowed to apply to the runner device (for example, `tag:github-ci`). 
      *(Note: If you don't have tags defined yet, you can create them in your tailnet Access Control Lists (ACLs) first).*
    - Click **Generate client** and copy both the **Client ID** and the **Client Secret**.
 
@@ -117,7 +117,7 @@ jobs:
         with:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
+          tags: tag:github-ci
 
       # 3. Deploy the files to a staging directory via rsync
       - name: Deploy files to Staging
