@@ -117,7 +117,8 @@ jobs:
     steps:
       # 1. Check out the repository
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+
 
       # 2. Connect to your private Tailscale network
       - name: Connect to Tailscale
