@@ -1,0 +1,70 @@
+name: Deploy Java Lambda Function
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'pom.xml'
+  workflow_dispatch: # Allows manual triggers
+
+# Permissions block is required for OIDC authentication
+permissions:
+  id-token: write # Required for requesting the JWT
+  contents: read  # Required for actions/checkout
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Check out code
+      - name: Checkout Code
+        uses: actions/checkout@v5
+
+      # 2. Set up Java 21 JDK
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      # 3. Compile and Package "Fat JAR"
+      - name: Build with Maven
+        run: mvn clean package -DskipTests
+
+      # 4. Authenticate to AWS via OIDC Role Assumption
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # 5. Deploy JAR to Lambda and publish a new version
+      - name: Update Lambda Function Code & Publish Version
+        id: deploy-lambda
+        run: |
+          VERSION=$(aws lambda update-function-code \
+            --function-name ${{ secrets.AWS_LAMBDA_FUNCTION_NAME }} \
+            --zip-file fileb://target/ChartGeneratorLambdaFunction-1.1-SNAPSHOT.jar \
+            --publish \
+            --query 'Version' \
+            --output text)
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      # 6. Point the 'prod' alias to the new version
+      - name: Update Lambda Alias
+        run: |
+          # Try to update the alias. If it doesn't exist, create it.
+          aws lambda update-alias \
+            --function-name ${{ secrets.AWS_LAMBDA_FUNCTION_NAME }} \
+            --name prod \
+            --function-version ${{ steps.deploy-lambda.outputs.VERSION }} \
+            || \
+          aws lambda create-alias \
+            --function-name ${{ secrets.AWS_LAMBDA_FUNCTION_NAME }} \
+            --name prod \
+            --function-version ${{ steps.deploy-lambda.outputs.VERSION }} \
+            --description "Production environment alias"
